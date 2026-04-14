@@ -97,13 +97,10 @@ def download_video(url: str, work_dir: str) -> tuple[str, str | None, str, str]:
         "--socket-timeout", "60",
         "--retries", "3",
         "--no-warnings",
-        "--extractor-args", "youtube:player_client=ios,web",
-        "--sleep-interval", "2",
-        "--max-sleep-interval", "5",
+        "--extractor-args", "youtube:player_client=web,default",
+        "--sleep-interval", "3",
+        "--max-sleep-interval", "6",
     ]
-    cookies_path = os.environ.get("YTDLP_COOKIES", "")
-    if cookies_path and os.path.exists(cookies_path):
-        cmd += ["--cookies", cookies_path]
     cmd.append(url)
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if result.returncode != 0:

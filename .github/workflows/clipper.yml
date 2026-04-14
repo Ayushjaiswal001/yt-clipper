@@ -32,6 +32,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Node.js (for PO token server)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Restore processed.json from cache
         uses: actions/cache/restore@v4
         with:
@@ -54,27 +59,15 @@ jobs:
       - name: Install Python dependencies
         run: pip install --no-cache-dir -r requirements.txt
 
-      - name: Decode YouTube cookies
-        env:
-          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
+      - name: Install PO token provider (YouTube bot bypass)
         run: |
-          if [ -z "$YTDLP_COOKIES_B64" ]; then
-            echo "⚠️  YTDLP_COOKIES_B64 not set – using iOS client fallback"
-          else
-            if printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > /tmp/cookies_raw.txt 2>/dev/null; then
-              # Only use if file has actual cookie lines (not just header)
-              if grep -qv '^#' /tmp/cookies_raw.txt 2>/dev/null && [ -s /tmp/cookies_raw.txt ]; then
-                mv /tmp/cookies_raw.txt /tmp/cookies.txt
-                chmod 600 /tmp/cookies.txt
-                echo "YTDLP_COOKIES=/tmp/cookies.txt" >> "$GITHUB_ENV"
-                echo "✓ Cookies loaded"
-              else
-                echo "⚠️  Cookie file has no valid entries – using iOS client fallback"
-              fi
-            else
-              echo "⚠️  base64 decode failed – using iOS client fallback"
-            fi
-          fi
+          pip install yt-dlp-get-pot
+          npm install -g @bgutil-io/bgutil-ytdlp-pot-provider
+          # Start the PO token server in background
+          nohup bgutil-ytdlp-pot-provider server > /tmp/pot_server.log 2>&1 &
+          echo "POT_SERVER_PID=$!" >> "$GITHUB_ENV"
+          sleep 5
+          echo "PO token server started"
 
       - name: Decode Google service account
         env:
@@ -104,7 +97,6 @@ jobs:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DRIVE_CONFIGURED: ${{ env.DRIVE_CONFIGURED }}
-          YTDLP_COOKIES: ${{ env.YTDLP_COOKIES }}
         run: python clipper.py
 
       - name: Save processed.json to cache
