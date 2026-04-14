@@ -1,0 +1,5 @@
+{
+  "clips_per_video": 4,
+  "min_clip_duration": 30,
+  "max_clip_duration": 90
+}

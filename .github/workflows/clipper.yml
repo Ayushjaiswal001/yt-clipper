@@ -1,0 +1,106 @@
+name: YouTube Clipper
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'queue.json'
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+jobs:
+  clip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Restore processed.json from cache
+        uses: actions/cache/restore@v4
+        with:
+          path: processed.json
+          key: clipper-processed-v1-${{ github.run_id }}
+          restore-keys: |
+            clipper-processed-v1-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg \
+            fonts-dejavu \
+            libass9 \
+            ca-certificates \
+            curl
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Install Python dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Decode Google service account
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" | base64 -d > /tmp/sa.json
+          chmod 600 /tmp/sa.json
+
+      - name: Configure rclone
+        run: |
+          mkdir -p "$HOME/.config/rclone"
+          echo '[gdrive]'                              > "$HOME/.config/rclone/rclone.conf"
+          echo 'type = drive'                         >> "$HOME/.config/rclone/rclone.conf"
+          echo 'scope = drive'                        >> "$HOME/.config/rclone/rclone.conf"
+          echo 'service_account_file = /tmp/sa.json'  >> "$HOME/.config/rclone/rclone.conf"
+
+      - name: Run clipper pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python clipper.py
+
+      - name: Save processed.json to cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: processed.json
+          key: clipper-processed-v1-${{ github.run_id }}
+
+      - name: Commit updated queue.json
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add queue.json
+          if git diff --cached --quiet; then
+            echo "queue.json unchanged – nothing to commit"
+          else
+            git commit -m "chore: remove processed URLs from queue [skip ci]"
+            git push
+          fi
+
+      - name: Upload run log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-log-${{ github.run_number }}
+          path: run_log.txt
+          if-no-files-found: ignore
+          retention-days: 14

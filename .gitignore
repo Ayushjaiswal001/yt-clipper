@@ -1,0 +1,24 @@
+# Credentials & secrets
+*.conf
+sa.json
+cookies.txt
+
+# Runtime artifacts – never commit these
+processed.json
+run_log.txt
+clips/
+
+# yt-dlp download temp files
+*.mp4
+*.webm
+*.m4a
+*.vtt
+*.srt
+*.info.json
+*.json.part
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
