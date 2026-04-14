@@ -25,6 +25,12 @@ def _safe_folder_name(title: str) -> str:
 
 
 def upload_clips(clips_dir: str, video_title: str, folder_id: str) -> str:
+    if os.environ.get("DRIVE_CONFIGURED", "true").lower() != "true":
+        log.warning("Drive not configured (GDRIVE_SERVICE_ACCOUNT_JSON not set) – skipping upload")
+        return "local-only"
+    if not os.path.exists(_SA_FILE):
+        log.warning(f"Service account file {_SA_FILE} missing – skipping upload")
+        return "local-only"
     """
     Upload all .mp4 files in clips_dir to Google Drive.
 

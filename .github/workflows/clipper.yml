@@ -58,10 +58,17 @@ jobs:
         env:
           GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: |
-          printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" | base64 -d > /tmp/sa.json
-          chmod 600 /tmp/sa.json
+          if [ -z "$GDRIVE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "⚠️  GDRIVE_SERVICE_ACCOUNT_JSON not set – Drive upload will be skipped"
+            echo "DRIVE_CONFIGURED=false" >> "$GITHUB_ENV"
+          else
+            printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" | base64 -d > /tmp/sa.json
+            chmod 600 /tmp/sa.json
+            echo "DRIVE_CONFIGURED=true" >> "$GITHUB_ENV"
+          fi
 
       - name: Configure rclone
+        if: env.DRIVE_CONFIGURED == 'true'
         run: |
           mkdir -p "$HOME/.config/rclone"
           echo '[gdrive]'                              > "$HOME/.config/rclone/rclone.conf"
@@ -74,6 +81,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRIVE_CONFIGURED: ${{ env.DRIVE_CONFIGURED }}
         run: python clipper.py
 
       - name: Save processed.json to cache
