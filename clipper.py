@@ -97,7 +97,9 @@ def download_video(url: str, work_dir: str) -> tuple[str, str | None, str, str]:
         "--socket-timeout", "60",
         "--retries", "3",
         "--no-warnings",
-        "--add-header", "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
+        "--extractor-args", "youtube:player_client=ios,web",
+        "--sleep-interval", "2",
+        "--max-sleep-interval", "5",
     ]
     cookies_path = os.environ.get("YTDLP_COOKIES", "")
     if cookies_path and os.path.exists(cookies_path):

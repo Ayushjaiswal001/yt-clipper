@@ -59,11 +59,21 @@ jobs:
           YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
         run: |
           if [ -z "$YTDLP_COOKIES_B64" ]; then
-            echo "⚠️  YTDLP_COOKIES_B64 not set – yt-dlp may be blocked by YouTube"
+            echo "⚠️  YTDLP_COOKIES_B64 not set – using iOS client fallback"
           else
-            printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > /tmp/cookies.txt
-            chmod 600 /tmp/cookies.txt
-            echo "YTDLP_COOKIES=/tmp/cookies.txt" >> "$GITHUB_ENV"
+            if printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > /tmp/cookies_raw.txt 2>/dev/null; then
+              # Only use if file has actual cookie lines (not just header)
+              if grep -qv '^#' /tmp/cookies_raw.txt 2>/dev/null && [ -s /tmp/cookies_raw.txt ]; then
+                mv /tmp/cookies_raw.txt /tmp/cookies.txt
+                chmod 600 /tmp/cookies.txt
+                echo "YTDLP_COOKIES=/tmp/cookies.txt" >> "$GITHUB_ENV"
+                echo "✓ Cookies loaded"
+              else
+                echo "⚠️  Cookie file has no valid entries – using iOS client fallback"
+              fi
+            else
+              echo "⚠️  base64 decode failed – using iOS client fallback"
+            fi
           fi
 
       - name: Decode Google service account
