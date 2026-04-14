@@ -97,8 +97,12 @@ def download_video(url: str, work_dir: str) -> tuple[str, str | None, str, str]:
         "--socket-timeout", "60",
         "--retries", "3",
         "--no-warnings",
-        url,
+        "--add-header", "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
     ]
+    cookies_path = os.environ.get("YTDLP_COOKIES", "")
+    if cookies_path and os.path.exists(cookies_path):
+        cmd += ["--cookies", cookies_path]
+    cmd.append(url)
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if result.returncode != 0:
         raise RuntimeError(f"yt-dlp exit {result.returncode}: {result.stderr[:300]}")

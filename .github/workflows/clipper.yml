@@ -54,6 +54,18 @@ jobs:
       - name: Install Python dependencies
         run: pip install --no-cache-dir -r requirements.txt
 
+      - name: Decode YouTube cookies
+        env:
+          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
+        run: |
+          if [ -z "$YTDLP_COOKIES_B64" ]; then
+            echo "⚠️  YTDLP_COOKIES_B64 not set – yt-dlp may be blocked by YouTube"
+          else
+            printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > /tmp/cookies.txt
+            chmod 600 /tmp/cookies.txt
+            echo "YTDLP_COOKIES=/tmp/cookies.txt" >> "$GITHUB_ENV"
+          fi
+
       - name: Decode Google service account
         env:
           GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
@@ -82,6 +94,7 @@ jobs:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DRIVE_CONFIGURED: ${{ env.DRIVE_CONFIGURED }}
+          YTDLP_COOKIES: ${{ env.YTDLP_COOKIES }}
         run: python clipper.py
 
       - name: Save processed.json to cache
