@@ -32,10 +32,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Set up Node.js (for PO token server)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - name: Ensure processed.json exists
+        run: '[ -f processed.json ] || echo "[]" > processed.json'
 
       - name: Restore processed.json from cache
         uses: actions/cache/restore@v4
@@ -56,25 +54,32 @@ jobs:
             curl
           curl -fsSL https://rclone.org/install.sh | sudo bash
 
+      - name: Start bgutil PO token provider (Docker)
+        run: |
+          docker run -d --name bgutil-provider \
+            -p 4416:4416 \
+            --restart unless-stopped \
+            brainicism/bgutil-ytdlp-pot-provider:latest
+          # Wait up to 60s for server to be ready
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4416/ping > /dev/null 2>&1; then
+              echo "✓ POT provider ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          echo "--- Container logs ---"
+          docker logs bgutil-provider 2>&1 | tail -15 || true
+
       - name: Install Python dependencies
         run: pip install --no-cache-dir -r requirements.txt
-
-      - name: Install PO token provider (YouTube bot bypass)
-        run: |
-          pip install yt-dlp-get-pot
-          npm install -g @bgutil-io/bgutil-ytdlp-pot-provider
-          # Start the PO token server in background
-          nohup bgutil-ytdlp-pot-provider server > /tmp/pot_server.log 2>&1 &
-          echo "POT_SERVER_PID=$!" >> "$GITHUB_ENV"
-          sleep 5
-          echo "PO token server started"
 
       - name: Decode Google service account
         env:
           GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
         run: |
           if [ -z "$GDRIVE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "⚠️  GDRIVE_SERVICE_ACCOUNT_JSON not set – Drive upload will be skipped"
+            echo "⚠️  GDRIVE_SERVICE_ACCOUNT_JSON not set"
             echo "DRIVE_CONFIGURED=false" >> "$GITHUB_ENV"
           else
             printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" | base64 -d > /tmp/sa.json
@@ -86,10 +91,12 @@ jobs:
         if: env.DRIVE_CONFIGURED == 'true'
         run: |
           mkdir -p "$HOME/.config/rclone"
-          echo '[gdrive]'                              > "$HOME/.config/rclone/rclone.conf"
-          echo 'type = drive'                         >> "$HOME/.config/rclone/rclone.conf"
-          echo 'scope = drive'                        >> "$HOME/.config/rclone/rclone.conf"
-          echo 'service_account_file = /tmp/sa.json'  >> "$HOME/.config/rclone/rclone.conf"
+          {
+            echo '[gdrive]'
+            echo 'type = drive'
+            echo 'scope = drive'
+            echo 'service_account_file = /tmp/sa.json'
+          } > "$HOME/.config/rclone/rclone.conf"
 
       - name: Run clipper pipeline
         env:
@@ -127,3 +134,7 @@ jobs:
           path: run_log.txt
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Stop PO token container
+        if: always()
+        run: docker stop bgutil-provider 2>/dev/null || true
