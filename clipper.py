@@ -97,7 +97,10 @@ def download_video(url: str, work_dir: str) -> tuple[str, str | None, str, str]:
         "--socket-timeout", "60",
         "--retries", "3",
         "--no-warnings",
-        "--extractor-args", "youtube:player_client=web,default",
+        # tv_simply is designed for TV apps — bypasses bot detection on
+        # datacenter IPs (GitHub Actions runs on flagged Azure IPs).
+        # mweb + default layered as fallbacks.
+        "--extractor-args", "youtube:player_client=tv_simply,mweb,default",
         "--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416",
         "--sleep-interval", "3",
         "--max-sleep-interval", "6",
