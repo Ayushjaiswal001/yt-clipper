@@ -98,6 +98,17 @@ jobs:
             echo 'service_account_file = /tmp/sa.json'
           } > "$HOME/.config/rclone/rclone.conf"
 
+      - name: Decode yt-dlp cookies
+        env:
+          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
+        run: |
+          if [ -n "$YTDLP_COOKIES_B64" ]; then
+            printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > /tmp/yt-cookies.txt
+            echo "✓ yt-dlp cookies decoded ($(wc -c < /tmp/yt-cookies.txt) bytes)"
+          else
+            echo "⚠ YTDLP_COOKIES_B64 not set – proceeding without cookies"
+          fi
+
       - name: Run clipper pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

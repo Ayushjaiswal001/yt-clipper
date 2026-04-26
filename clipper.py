@@ -97,14 +97,19 @@ def download_video(url: str, work_dir: str) -> tuple[str, str | None, str, str]:
         "--socket-timeout", "60",
         "--retries", "3",
         "--no-warnings",
-        # tv_simply is designed for TV apps — bypasses bot detection on
-        # datacenter IPs (GitHub Actions runs on flagged Azure IPs).
-        # mweb + default layered as fallbacks.
-        "--extractor-args", "youtube:player_client=tv_simply,mweb,default",
-        "--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416",
+        # android_testsuite uses Google's internal test-app client ID —
+        # YouTube's anti-abuse layer doesn't scrutinise it like web clients.
+        # This is the #1 recommended fix for GitHub Actions / datacenter IPs.
+        # bgutil PO token plugin auto-activates for clients that need it; no
+        # explicit extractor-arg required for Android clients.
+        "--extractor-args", "youtube:player_client=android_testsuite,android_embedded,mweb",
         "--sleep-interval", "3",
         "--max-sleep-interval", "6",
     ]
+    # Inject cookies if the workflow decoded YTDLP_COOKIES_B64 to disk
+    cookies_path = "/tmp/yt-cookies.txt"
+    if os.path.exists(cookies_path):
+        cmd += ["--cookies", cookies_path]
     cmd.append(url)
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if result.returncode != 0:

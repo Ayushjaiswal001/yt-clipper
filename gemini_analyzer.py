@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Gemini Analyzer – sends transcript to Gemini 2.0 Flash and returns ClipSpec list.
+Uses google-genai SDK (google.generativeai is EOL).
 """
 
 import json
@@ -10,7 +11,8 @@ import re
 import time
 from dataclasses import dataclass, field
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 log = logging.getLogger(__name__)
 
@@ -101,8 +103,7 @@ def analyze_transcript(transcript: str, video_title: str, config: dict) -> list[
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY environment variable is not set")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    client = genai.Client(api_key=api_key)
 
     n = config.get("clips_per_video", 4)
     min_dur = config.get("min_clip_duration", 30)
@@ -119,9 +120,10 @@ def analyze_transcript(transcript: str, video_title: str, config: dict) -> list[
     for attempt, system_prompt in enumerate(prompts, start=1):
         try:
             log.info(f"Gemini request (attempt {attempt}/2)…")
-            response = model.generate_content(
-                f"{system_prompt}\n\n{user_msg}",
-                generation_config=genai.types.GenerationConfig(
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=f"{system_prompt}\n\n{user_msg}",
+                config=types.GenerateContentConfig(
                     temperature=0.3,
                     max_output_tokens=2048,
                 ),
