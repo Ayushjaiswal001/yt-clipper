@@ -103,8 +103,12 @@ jobs:
           YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
         run: |
           if [ -n "$YTDLP_COOKIES_B64" ]; then
-            printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > /tmp/yt-cookies.txt
-            echo "✓ yt-dlp cookies decoded ($(wc -c < /tmp/yt-cookies.txt) bytes)"
+            if printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > /tmp/yt-cookies.txt 2>/dev/null; then
+              echo "✓ yt-dlp cookies decoded ($(wc -c < /tmp/yt-cookies.txt) bytes)"
+            else
+              echo "⚠ YTDLP_COOKIES_B64 is set but base64 decode failed – proceeding without cookies"
+              rm -f /tmp/yt-cookies.txt
+            fi
           else
             echo "⚠ YTDLP_COOKIES_B64 not set – proceeding without cookies"
           fi
